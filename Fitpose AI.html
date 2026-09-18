@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fit Pose - AI Bodyweight Tracking & Fitness RPG</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              900: '#14532d',
+            },
+            cyber: {
+              cyan: '#06b6d4',
+              violet: '#8b5cf6',
+              amber: '#f59e0b',
+              rose: '#f43f5e'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts & FontAwesome Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  
+  <!-- Chart.js for Data Visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- MediaPipe Pose and Camera Utilities -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
+  <style>
+    .glass-card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-card-hover {
+      transition: all 0.25s ease-in-out;
+    }
+    .glass-card-hover:hover {
+      border-color: rgba(34, 197, 94, 0.4);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px -5px rgba(34, 197, 94, 0.15);
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(51, 65, 85, 0.8);
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(34, 197, 94, 0.6);
+    }
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 0.8; }
+    }
+    .animate-pulse-glow {
+      animation: pulse-glow 2.5s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="h-full bg-slate-950 text-slate-100 flex flex-col font-sans overflow-x-hidden selection:bg-brand-500 selection:text-slate-950">
+
+  <!-- TOP NAVIGATION HEADER -->
+  <header class="sticky top-0 z-40 w-full glass-card border-b border-slate-800/80 px-4 lg:px-8 py-3">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      
+      <!-- Brand Logo -->
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('workout')">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 via-emerald-500 to-cyber-cyan p-0.5 shadow-lg shadow-brand-500/20">
+          <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+            <i class="fa-solid fa-person-running text-brand-500 text-xl"></i>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-xl font-black tracking-wider bg-gradient-to-r from-white via-slate-100 to-brand-500 bg-clip-text text-transparent">FIT POSE</h1>
+            <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest bg-brand-500/10 text-brand-400 border border-brand-500/20 rounded-full">AI RPG</span>
+          </div>
+          <p class="text-[11px] text-slate-400 font-medium">Real-time Pose & Movement Intelligence</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="hidden md:flex items-center space-x-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800">
+        <button id="nav-btn-workout" onclick="switchTab('workout')" class="px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center space-x-2 bg-brand-500 text-slate-950 shadow-md">
+          <i class="fa-solid fa-camera font-bold"></i>
+          <span>Workout Studio</span>
+        </button>
+        <button id="nav-btn-codex" onclick="switchTab('codex')" class="px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-slate-800/60">
+          <i class="fa-solid fa-book-open"></i>
+          <span>Exercise Codex</span>
+        </button>
+        <button id="nav-btn-dashboard" onclick="switchTab('dashboard')" class="px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-slate-800/60">
+          <i class="fa-solid fa-chart-line"></i>
+          <span>Analytics & Goals</span>
+        </button>
+      </nav>
+
+      <!-- Player RPG Mini Bar -->
+      <div class="flex items-center space-x-3">
+        <!-- Coins -->
+        <div class="hidden sm:flex items-center space-x-1.5 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-lg text-amber-400 text-xs font-bold">
+          <i class="fa-solid fa-coins text-amber-400"></i>
+          <span id="user-coins-display">0</span>
+        </div>
+        <!-- Level Tag -->
+        <div class="flex items-center space-x-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl cursor-pointer hover:border-brand-500/40 transition-all" onclick="showLevelStatsModal()">
+          <div class="w-7 h-7 rounded-lg bg-brand-500/20 border border-brand-500/30 flex items-center justify-center text-brand-400 font-extrabold text-xs" id="header-user-lvl">
+            1
+          </div>
+          <div class="hidden lg:block text-left">
+            <div class="text-[11px] font-bold text-slate-200" id="header-user-rank">Novice Athlete</div>
+            <div class="w-24 bg-slate-800 h-1.5 rounded-full overflow-hidden mt-0.5">
+              <div id="header-xp-bar" class="bg-gradient-to-r from-brand-500 to-cyber-cyan h-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 md:p-6 lg:p-8 flex flex-col space-y-6">
+
+    <!-- TAB 1: WORKOUT STUDIO -->
+    <section id="tab-workout" class="flex flex-col space-y-6">
+      
+      <!-- Top Action Bar / Exercise Selector -->
+      <div class="glass-card p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex items-center space-x-3">
+          <button onclick="openExerciseSelectorModal()" class="flex items-center space-x-3 bg-slate-900 border border-slate-700/80 hover:border-brand-500 px-4 py-2.5 rounded-xl transition-all group">
+            <div id="selected-exercise-icon-box" class="w-9 h-9 rounded-lg bg-brand-500/10 flex items-center justify-center text-brand-400 group-hover:bg-brand-500 group-hover:text-slate-950 transition-all">
+              <i class="fa-solid fa-person-running text-lg"></i>
+            </div>
+            <div class="text-left">
+              <span class="text-[10px] uppercase tracking-wider font-bold text-slate-400 block">Current Exercise</span>
+              <span id="current-exercise-title" class="font-extrabold text-slate-100 text-base">Bodyweight Squats</span>
+            </div>
+            <i class="fa-solid fa-chevron-down text-slate-400 ml-2 text-xs group-hover:text-brand-400"></i>
+          </button>
+
+          <!-- Type Badge -->
+          <div id="current-exercise-badge" class="px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider bg-cyber-cyan/10 border border-cyber-cyan/20 text-cyber-cyan">
+            Dynamic Rep
+          </div>
+        </div>
+
+        <!-- Camera Controls & Sound Toggle -->
+        <div class="flex items-center space-x-2">
+          <button id="btn-toggle-camera" onclick="toggleCamera()" class="flex-1 md:flex-initial px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-slate-950 font-bold text-sm transition-all shadow-lg shadow-brand-500/20 flex items-center justify-center space-x-2">
+            <i id="icon-camera" class="fa-solid fa-video"></i>
+            <span id="text-camera">Start Camera</span>
+          </button>
+          
+          <button onclick="toggleAudioSFX()" id="btn-audio-toggle" title="Toggle SFX" class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-all">
+            <i id="icon-audio" class="fa-solid fa-volume-high"></i>
+          </button>
+
+          <button onclick="resetCurrentSession()" title="Reset Counter" class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-rose-400 hover:border-rose-500/30 transition-all">
+            <i class="fa-solid fa-rotate-left"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Vision Viewport & Live Telemetry Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Video Feed & Pose Skeleton Container -->
+        <div class="lg:col-col-span-8 lg:col-span-8 flex flex-col">
+          <div class="relative w-full aspect-video bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl flex items-center justify-center">
+            
+            <!-- Hidden Raw Video Element -->
+            <video id="webcam" class="hidden" playsinline></video>
+            
+            <!-- Render Overlay Canvas -->
+            <canvas id="output_canvas" class="w-full h-full object-cover transform -scale-x-100"></canvas>
+            
+            <!-- Camera Disabled / Idle Overlay -->
+            <div id="camera-idle-placeholder" class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-slate-950/90 z-10 space-y-4">
+              <div class="w-16 h-16 rounded-2xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-500 text-3xl animate-pulse-glow">
+                <i class="fa-solid fa-camera"></i>
+              </div>
+              <div>
+                <h3 class="text-xl font-extrabold text-white">Camera Standby</h3>
+                <p class="text-xs text-slate-400 max-w-sm mt-1">Click "Start Camera" above to launch Fit Pose AI movement tracking. Ensure full body visibility in good lighting.</p>
+              </div>
+            </div>
+
+            <!-- Form Feedback Banner (Top Overlay) -->
+            <div class="absolute top-4 left-4 right-4 z-20 flex items-center justify-between pointer-events-none">
+              <div id="form-feedback-pill" class="glass-card px-4 py-2 rounded-xl border border-slate-700/80 flex items-center space-x-2 text-xs font-bold text-slate-200 shadow-xl transition-all">
+                <span class="w-2.5 h-2.5 rounded-full bg-slate-500 animate-ping" id="status-dot"></span>
+                <span id="feedback-text">Awaiting posture recognition...</span>
+              </div>
+              
+              <!-- Orientation Telemetry Badge -->
+              <div id="orientation-badge" class="glass-card px-3 py-1.5 rounded-xl border border-slate-800 text-[11px] font-mono text-slate-300 hidden sm:block">
+                View: <span id="orientation-text" class="text-brand-400 font-bold">Auto</span>
+              </div>
+            </div>
+
+            <!-- On-Screen Realtime Stat Counter Overlay (Bottom Overlay) -->
+            <div class="absolute bottom-4 left-4 right-4 z-20 flex items-end justify-between pointer-events-none">
+              <div class="glass-card px-5 py-3 rounded-2xl border border-brand-500/30 flex items-center space-x-4 shadow-2xl">
+                <div>
+                  <span id="metric-label" class="text-[10px] font-extrabold uppercase tracking-widest text-brand-400 block">Total Reps</span>
+                  <span id="primary-metric-val" class="text-4xl sm:text-5xl font-black tracking-tight text-white font-mono">0</span>
+                </div>
+                <div class="h-8 w-px bg-slate-800"></div>
+                <div>
+                  <span id="secondary-metric-label" class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block">Phase / Form</span>
+                  <span id="secondary-metric-val" class="text-sm font-bold text-emerald-400">Ready</span>
+                </div>
+              </div>
+
+              <!-- Primary Angle Display -->
+              <div class="glass-card px-4 py-3 rounded-2xl border border-slate-800 text-right hidden sm:block">
+                <span class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block">Joint Angle</span>
+                <span id="joint-angle-val" class="text-2xl font-black text-cyber-cyan font-mono">0°</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Workout HUD & RPG Session Stats Sidebar -->
+        <div class="lg:col-span-4 flex flex-col space-y-4">
+          
+          <!-- Exercise Quick Info Box -->
+          <div class="glass-card p-5 rounded-2xl space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Target Muscles</span>
+              <span id="target-muscle-tags" class="text-xs font-semibold text-brand-400">Quadriceps, Glutes</span>
+            </div>
+            <p id="exercise-quick-tip" class="text-xs text-slate-300 leading-relaxed bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+              Keep your feet shoulder-width apart. Lower hips until thighs are parallel to ground while keeping chest elevated.
+            </p>
+          </div>
+
+          <!-- Session Progress Card -->
+          <div class="glass-card p-5 rounded-2xl space-y-4 flex-1 flex flex-col justify-between">
+            <div>
+              <h3 class="text-sm font-extrabold uppercase tracking-wider text-slate-300 mb-3 flex items-center justify-between">
+                <span>Session Rewards</span>
+                <i class="fa-solid fa-trophy text-amber-400"></i>
+              </h3>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div class="bg-slate-900/80 border border-slate-800 p-3 rounded-xl">
+                  <span class="text-[10px] uppercase font-bold text-slate-400 block">XP Earned</span>
+                  <span id="session-xp-gained" class="text-xl font-black text-brand-400 font-mono">+0 XP</span>
+                </div>
+                <div class="bg-slate-900/80 border border-slate-800 p-3 rounded-xl">
+                  <span class="text-[10px] uppercase font-bold text-slate-400 block">Coins Bonus</span>
+                  <span id="session-coins-gained" class="text-xl font-black text-amber-400 font-mono">+0</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Form Accuracy Meter -->
+            <div class="space-y-2">
+              <div class="flex items-center justify-between text-xs font-bold">
+                <span class="text-slate-400">Form Integrity Score</span>
+                <span id="form-integrity-score" class="text-emerald-400">100%</span>
+              </div>
+              <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
+                <div id="form-integrity-bar" class="bg-gradient-to-r from-emerald-500 to-brand-500 h-full transition-all duration-300" style="width: 100%"></div>
+              </div>
+            </div>
+
+            <!-- Complete Set & Log Button -->
+            <button onclick="finishAndLogWorkoutSet()" class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-brand-500 to-emerald-600 hover:from-brand-600 hover:to-emerald-700 text-slate-950 font-black tracking-wide text-sm transition-all shadow-lg shadow-brand-500/20 flex items-center justify-center space-x-2">
+              <i class="fa-solid fa-check-double"></i>
+              <span>Save & Finish Set</span>
+            </button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- TAB 2: EXERCISE CODEX -->
+    <section id="tab-codex" class="hidden flex-col space-y-6">
+      
+      <!-- Search & Category Filters -->
+      <div class="glass-card p-5 rounded-2xl space-y-4">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-black tracking-wide text-white">Exercise Codex & Mechanics</h2>
+            <p class="text-xs text-slate-400">Comprehensive execution guides and AI pose telemetry instructions for all exercises.</p>
+          </div>
+
+          <!-- Instant Search Bar -->
+          <div class="relative w-full md:w-72">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-sm"></i>
+            <input type="text" id="codex-search-input" oninput="filterCodexExercises()" placeholder="Search exercise or muscle..." class="w-full bg-slate-900 border border-slate-700/80 focus:border-brand-500 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none transition-all" />
+          </div>
+        </div>
+
+        <!-- Muscle Group Filter Chips -->
+        <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-800/80" id="codex-filter-chips">
+          <button onclick="setCodexFilter('all')" class="codex-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-brand-500 text-slate-950">All</button>
+          <button onclick="setCodexFilter('Chest')" class="codex-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-slate-900 text-slate-400 border border-slate-800 hover:text-white">Chest</button>
+          <button onclick="setCodexFilter('Back')" class="codex-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-slate-900 text-slate-400 border border-slate-800 hover:text-white">Back</button>
+          <button onclick="setCodexFilter('Legs')" class="codex-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-slate-900 text-slate-400 border border-slate-800 hover:text-white">Legs</button>
+          <button onclick="setCodexFilter('Abs')" class="codex-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-slate-900 text-slate-400 border border-slate-800 hover:text-white">Abs & Core</button>
+          <button onclick="setCodexFilter('Arms')" class="codex-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-slate-900 text-slate-400 border border-slate-800 hover:text-white">Arms & Shoulders</button>
+          <button onclick="setCodexFilter('Cardio')" class="codex-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-slate-900 text-slate-400 border border-slate-800 hover:text-white">Cardio</button>
+        </div>
+      </div>
+
+      <!-- Codex Exercise Grid -->
+      <div id="codex-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Rendered via JS -->
+      </div>
+
+    </section>
+
+    <!-- TAB 3: DASHBOARD & GOALS -->
+    <section id="tab-dashboard" class="hidden flex-col space-y-6">
+      
+      <!-- Upper Analytics Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <div class="glass-card p-5 rounded-2xl space-y-2">
+          <div class="flex items-center justify-between text-slate-400">
+            <span class="text-xs font-bold uppercase tracking-wider">Total Workouts</span>
+            <i class="fa-solid fa-dumbbell text-brand-500"></i>
+          </div>
+          <div id="dash-total-workouts" class="text-3xl font-black text-white font-mono">0</div>
+          <p class="text-[11px] text-slate-400">Completed sets logged</p>
+        </div>
+
+        <div class="glass-card p-5 rounded-2xl space-y-2">
+          <div class="flex items-center justify-between text-slate-400">
+            <span class="text-xs font-bold uppercase tracking-wider">Total Reps</span>
+            <i class="fa-solid fa-calculator text-cyber-cyan"></i>
+          </div>
+          <div id="dash-total-reps" class="text-3xl font-black text-white font-mono">0</div>
+          <p class="text-[11px] text-slate-400">Cumulative bodyweight reps</p>
+        </div>
+
+        <div class="glass-card p-5 rounded-2xl space-y-2">
+          <div class="flex items-center justify-between text-slate-400">
+            <span class="text-xs font-bold uppercase tracking-wider">Time Under Tension</span>
+            <i class="fa-solid fa-stopwatch text-cyber-violet"></i>
+          </div>
+          <div id="dash-total-hold-time" class="text-3xl font-black text-white font-mono">0s</div>
+          <p class="text-[11px] text-slate-400">Total isometric hold duration</p>
+        </div>
+
+        <div class="glass-card p-5 rounded-2xl space-y-2">
+          <div class="flex items-center justify-between text-slate-400">
+            <span class="text-xs font-bold uppercase tracking-wider">Active Streak</span>
+            <i class="fa-solid fa-fire text-amber-500"></i>
+          </div>
+          <div id="dash-active-streak" class="text-3xl font-black text-white font-mono">1 Day</div>
+          <p class="text-[11px] text-slate-400">Consecutive daily training</p>
+        </div>
+
+      </div>
+
+      <!-- Charts Section -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Weekly Volume Bar Chart -->
+        <div class="lg:col-span-7 glass-card p-6 rounded-2xl flex flex-col justify-between">
+          <h3 class="text-base font-extrabold text-white mb-4 flex items-center justify-between">
+            <span>Weekly Rep Volume</span>
+            <span class="text-xs text-slate-400 font-normal">Last 7 Days</span>
+          </h3>
+          <div class="w-full h-64">
+            <canvas id="chart-weekly-volume"></canvas>
+          </div>
+        </div>
+
+        <!-- Muscle Group Radar Chart -->
+        <div class="lg:col-span-5 glass-card p-6 rounded-2xl flex flex-col justify-between">
+          <h3 class="text-base font-extrabold text-white mb-4 flex items-center justify-between">
+            <span>Muscle Group Focus</span>
+            <span class="text-xs text-slate-400 font-normal">Distribution</span>
+          </h3>
+          <div class="w-full h-64 flex items-center justify-center">
+            <canvas id="chart-muscle-radar"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Goals & Data Management -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Daily / Weekly Goal Tracker -->
+        <div class="lg:col-span-7 glass-card p-6 rounded-2xl space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-base font-extrabold text-white">Fitness Goals</h3>
+              <p class="text-xs text-slate-400">Set daily target goals and track progress.</p>
+            </div>
+            <button onclick="openCreateGoalModal()" class="px-3.5 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-slate-950 font-bold text-xs transition-all flex items-center space-x-1.5">
+              <i class="fa-solid fa-plus"></i>
+              <span>New Goal</span>
+            </button>
+          </div>
+
+          <div id="goals-container-list" class="space-y-3">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- Workout Activity Logs & Data Export -->
+        <div class="lg:col-span-5 glass-card p-6 rounded-2xl flex flex-col justify-between space-y-4">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-base font-extrabold text-white">Recent Activity Log</h3>
+              <button onclick="exportDataJSON()" class="text-xs text-brand-400 hover:underline">Export JSON</button>
+            </div>
+            
+            <div id="recent-activity-list" class="space-y-2 max-h-56 overflow-y-auto custom-scrollbar pr-1">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
+            <span class="text-slate-400">Fit Pose Data Storage v1.0</span>
+            <button onclick="resetAllAppData()" class="text-rose-400 hover:text-rose-300 font-semibold">Clear All Data</button>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- MODAL 1: EXERCISE SELECTION MODAL -->
+  <div id="modal-exercise-selector" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4">
+    <div class="glass-card max-w-2xl w-full max-h-[85vh] rounded-3xl border border-slate-700/80 flex flex-col overflow-hidden shadow-2xl">
+      
+      <!-- Modal Header -->
+      <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-black text-white">Select Exercise</h3>
+          <p class="text-xs text-slate-400">Choose an exercise for AI camera pose tracking.</p>
+        </div>
+        <button onclick="closeExerciseSelectorModal()" class="w-8 h-8 rounded-full bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Search & Filters -->
+      <div class="p-4 bg-slate-900/60 border-b border-slate-800 space-y-3">
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-sm"></i>
+          <input type="text" id="modal-exercise-search" oninput="filterModalExercises()" placeholder="Search 25+ bodyweight & hold exercises..." class="w-full bg-slate-950 border border-slate-800 focus:border-brand-500 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none transition-all" />
+        </div>
+        
+        <div class="flex flex-wrap gap-2" id="modal-filter-tags">
+          <button onclick="setModalFilter('all')" class="modal-tag-btn px-3 py-1 rounded-lg text-xs font-bold bg-brand-500 text-slate-950">All</button>
+          <button onclick="setModalFilter('Chest')" class="modal-tag-btn px-3 py-1 rounded-lg text-xs font-bold bg-slate-900 text-slate-400 border border-slate-800">Chest</button>
+          <button onclick="setModalFilter('Back')" class="modal-tag-btn px-3 py-1 rounded-lg text-xs font-bold bg-slate-900 text-slate-400 border border-slate-800">Back</button>
+          <button onclick="setModalFilter('Legs')" class="modal-tag-btn px-3 py-1 rounded-lg text-xs font-bold bg-slate-900 text-slate-400 border border-slate-800">Legs</button>
+          <button onclick="setModalFilter('Abs')" class="modal-tag-btn px-3 py-1 rounded-lg text-xs font-bold bg-slate-900 text-slate-400 border border-slate-800">Abs</button>
+          <button onclick="setModalFilter('Arms')" class="modal-tag-btn px-3 py-1 rounded-lg text-xs font-bold bg-slate-900 text-slate-400 border border-slate-800">Arms</button>
+        </div>
+      </div>
+
+      <!-- Exercises List Scroll Area -->
+      <div id="modal-exercise-list" class="p-4 overflow-y-auto custom-scrollbar space-y-2 flex-1 max-h-96">
+        <!-- Rendered via JS -->
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL 2: NEW GOAL MODAL -->
+  <div id="modal-create-goal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4">
+    <div class="glass-card max-w-md w-full rounded-3xl border border-slate-700/80 p-6 space-y-5 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-black text-white">Create Fitness Goal</h3>
+        <button onclick="closeCreateGoalModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Target Exercise</label>
+          <select id="goal-input-exercise" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+            <!-- Options populated dynamically -->
+          </select>
+        </div>
+
+        <div>
+          <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Target Amount (Reps / Seconds)</label>
+          <input type="number" id="goal-input-target" min="1" value="50" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500" />
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-3 pt-2">
+        <button onclick="closeCreateGoalModal()" class="flex-1 py-2.5 rounded-xl bg-slate-900 text-slate-400 font-bold text-sm">Cancel</button>
+        <button onclick="saveNewGoal()" class="flex-1 py-2.5 rounded-xl bg-brand-500 text-slate-950 font-extrabold text-sm shadow-lg shadow-brand-500/20">Create Goal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: RPG LEVEL UP CELEBRATION MODAL -->
+  <div id="modal-level-up" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md hidden items-center justify-center p-4">
+    <div class="glass-card max-w-sm w-full rounded-3xl border border-amber-500/40 p-6 text-center space-y-5 shadow-2xl relative overflow-hidden">
+      
+      <div class="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-300 p-1 shadow-xl shadow-amber-500/30">
+        <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-amber-400 text-3xl font-black" id="modal-lvl-num">
+          2
+        </div>
+      </div>
+
+      <div>
+        <span class="text-xs font-extrabold uppercase tracking-widest text-amber-400 block">LEVEL UP!</span>
+        <h3 class="text-2xl font-black text-white mt-1" id="modal-lvl-title">Intermediate Athlete</h3>
+        <p class="text-xs text-slate-300 mt-2">You've unlocked a new rank in Fit Pose RPG! Keep pushing your limits.</p>
+      </div>
+
+      <button onclick="closeLevelUpModal()" class="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black tracking-wide text-sm shadow-lg shadow-amber-500/20">
+        Claim Rewards & Continue
+      </button>
+    </div>
+  </div>
+
+  <script>
+    /* ========================================================================
+       FIT POSE - EXERCISE DATABASE (25+ BODYWEIGHT & ISOMETRIC HOLDS)
+       ======================================================================== */
+    const EXERCISE_DATABASE = [
+      {
+        id: 'squats',
+        name: 'Bodyweight Squats',
+        category: 'Legs',
+        type: 'rep',
+        icon: 'fa-person-running',
+        muscles: 'Quadriceps, Glutes, Hamstrings',
+        difficulty: 'Beginner',
+        primaryJoint: 'knee',
+        repAngleMin: 90,
+        repAngleMax: 165,
+        tip: 'Lower hips until knees bend past 90 degrees while maintaining vertical posture.',
+        cameraAngleTip: 'Place camera at side angle at waist height.'
+      },
+      {
+        id: 'pushups',
+        name: 'Push-ups',
+        category: 'Chest',
+        type: 'rep',
+        icon: 'fa-child-reaching',
+        muscles: 'Chest, Triceps, Anterior Deltoids',
+        difficulty: 'Beginner',
+        primaryJoint: 'elbow',
+        repAngleMin: 85,
+        repAngleMax: 160,
+        tip: 'Lower chest to floor bending elbows to 90 degrees, keep core tight.',
+        cameraAngleTip: 'Side camera angle works best.'
+      },
+      {
+        id: 'plank',
+        name: 'Plank Hold',
+        category: 'Abs',
+        type: 'hold',
+        icon: 'fa-border-all',
+        muscles: 'Core, Abdominals, Shoulders',
+        difficulty: 'Beginner',
+        primaryJoint: 'hip',
+        holdTargetAngle: 170,
+        holdTolerance: 20,
+        tip: 'Maintain straight line from shoulders to ankles without sagging hips.',
+        cameraAngleTip: 'Full side view required.'
+      },
+      {
+        id: 'lunges',
+        name: 'Forward Lunges',
+        category: 'Legs',
+        type: 'rep',
+        icon: 'fa-person-walking-arrow-right',
+        muscles: 'Quadriceps, Glutes',
+        difficulty: 'Intermediate',
+        primaryJoint: 'knee',
+        repAngleMin: 95,
+        repAngleMax: 160,
+        tip: 'Step forward and lower back knee toward ground until front leg forms 90 degrees.',
+        cameraAngleTip: 'Side camera view recommended.'
+      },
+      {
+        id: 'jumping_jacks',
+        name: 'Jumping Jacks',
+        category: 'Cardio',
+        type: 'rep',
+        icon: 'fa-person-rays',
+        muscles: 'Full Body, Heart Rate',
+        difficulty: 'Beginner',
+        primaryJoint: 'shoulder',
+        repAngleMin: 40,
+        repAngleMax: 140,
+        tip: 'Raise arms overhead while jumping feet outwards.',
+        cameraAngleTip: 'Front facing camera required.'
+      },
+      {
+        id: 'wall_sit',
+        name: 'Wall Sit Hold',
+        category: 'Legs',
+        type: 'hold',
+        icon: 'fa-chair',
+        muscles: 'Quadriceps, Calves',
+        difficulty: 'Intermediate',
+        primaryJoint: 'knee',
+        holdTargetAngle: 95,
+        holdTolerance: 15,
+        tip: 'Back flat against wall with knees bent at 90 degrees.',
+        cameraAngleTip: 'Side camera view.'
+      },
+      {
+        id: 'pullups',
+        name: 'Pull-ups',
+        category: 'Back',
+        type: 'rep',
+        icon: 'fa-child-combat',
+        muscles: 'Lats, Biceps, Upper Back',
+        difficulty: 'Advanced',
+        primaryJoint: 'elbow',
+        repAngleMin: 70,
+        repAngleMax: 150,
+        tip: 'Pull chin above bar level and lower to full arm extension.',
+        cameraAngleTip: 'Front or rear camera view.'
+      },
+      {
+        id: 'dips',
+        name: 'Tricep Dips',
+        category: 'Arms',
+        type: 'rep',
+        icon: 'fa-hands-holding-child',
+        muscles: 'Triceps, Chest, Shoulders',
+        difficulty: 'Intermediate',
+        primaryJoint: 'elbow',
+        repAngleMin: 90,
+        repAngleMax: 160,
+        tip: 'Lower torso by bending elbows to 90 degrees then press upwards.',
+        cameraAngleTip: 'Side camera view.'
+      },
+      {
+        id: 'situps',
+        name: 'Sit-ups',
+        category: 'Abs',
+        type: 'rep',
+        icon: 'fa-person-falling',
+        muscles: 'Rectus Abdominis',
+        difficulty: 'Beginner',
+        primaryJoint: 'hip',
+        repAngleMin: 55,
+        repAngleMax: 130,
+        tip: 'Flex torso towards knees engaged through core musculature.',
+        cameraAngleTip: 'Side camera view.'
+      },
+      {
+        id: 'high_knees',
+        name: 'High Knees',
+        category: 'Cardio',
+        type: 'rep',
+        icon: 'fa-person-running',
+        muscles: 'Hip Flexors, Cardio',
+        difficulty: 'Beginner',
+        primaryJoint: 'hip',
+        repAngleMin: 80,
+        repAngleMax: 150,
+        tip: 'Drive knees up to hip level sequentially with high tempo.',
+        cameraAngleTip: 'Front facing camera view.'
+      },
+      {
+        id: 'side_plank',
+        name: 'Side Plank Hold',
+        category: 'Abs',
+        type: 'hold',
+        icon: 'fa-ruler-horizontal',
+        muscles: 'Obliques, Core',
+        difficulty: 'Intermediate',
+        primaryJoint: 'hip',
+        holdTargetAngle: 175,
+        holdTolerance: 15,
+        tip: 'Support body laterally on one forearm creating a straight diagonal line.',
+        cameraAngleTip: 'Front/side diagonal camera.'
+      },
+      {
+        id: 'glute_bridge',
+        name: 'Glute Bridge Hold',
+        category: 'Legs',
+        type: 'hold',
+        icon: 'fa-bridge',
+        muscles: 'Glutes, Lower Back',
+        difficulty: 'Beginner',
+        primaryJoint: 'hip',
+        holdTargetAngle: 170,
+        holdTolerance: 15,
+        tip: 'Drive hips upward squeezing glutes at peak position.',
+        cameraAngleTip: 'Side camera view.'
+      }
+    ];
+
+    /* ========================================================================
+       APPLICATION STATE MANAGEMENT & LOCAL STORAGE
+       ======================================================================== */
+    const STORAGE_KEY = 'fit_pose_data_v1';
+
+    let appState = {
+      user: {
+        xp: 0,
+        level: 1,
+        rank: 'Novice Athlete',
+        coins: 0,
+        streak: 1,
+        lastActiveDate: new Date().toISOString().split('T')[0]
+      },
+      currentExercise: EXERCISE_DATABASE[0],
+      session: {
+        reps: 0,
+        holdSeconds: 0,
+        repPhase: 'up', // 'up' or 'down'
+        holdActive: false,
+        startTime: null,
+        formAccuracy: 100,
+        formChecksCount: 0,
+        formChecksValid: 0
+      },
+      goals: [
+        { id: 'g1', exerciseId: 'squats', target: 50, current: 0, completed: false },
+        { id: 'g2', exerciseId: 'plank', target: 60, current: 0, completed: false }
+      ],
+      history: []
+    };
+
+    // Load State from Local Storage
+    function loadAppState() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          appState = { ...appState, ...parsed };
+        }
+      } catch (e) {
+        console.error("Failed to load state", e);
+      }
+      updateUserHeaderUI();
+    }
+
+    // Save State to Local Storage
+    function saveAppState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+      } catch (e) {
+        console.error("Failed to save state", e);
+      }
+    }
+
+    /* Web Audio SFX Synthesizer */
+    let audioEnabled = true;
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playBeep(freq = 520, duration = 0.1, type = 'sine') {
+      if (!audioEnabled || audioCtx.state === 'suspended') return;
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function playLevelUpSound() {
+      if (!audioEnabled) return;
+      [440, 554, 659, 880].forEach((freq, idx) => {
+        setTimeout(() => playBeep(freq, 0.25, 'triangle'), idx * 120);
+      });
+    }
+
+    function toggleAudioSFX() {
+      audioEnabled = !audioEnabled;
+      const icon = document.getElementById('icon-audio');
+      if (audioEnabled) {
+        icon.className = 'fa-solid fa-volume-high';
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+      } else {
+        icon.className = 'fa-solid fa-volume-xmark';
+      }
+    }
+
+    /* ========================================================================
+       FIT POSE RPG PROGRESSION ENGINE
+       ======================================================================== */
+    const RPG_RANKS = [
+      { lvl: 1, name: 'Novice Athlete', minXp: 0 },
+      { lvl: 2, name: 'Apprentice Motion', minXp: 100 },
+      { lvl: 3, name: 'Kinetic Warrior', minXp: 250 },
+      { lvl: 4, name: 'Pose Specialist', minXp: 500 },
+      { lvl: 5, name: 'Master Movement', minXp: 1000 },
+      { lvl: 6, name: 'Grandmaster Fit', minXp: 2000 }
+    ];
+
+    function addXP(amount) {
+      appState.user.xp += amount;
+      appState.user.coins += Math.floor(amount / 2);
+
+      // Check level up
+      let currentLvlObj = RPG_RANKS[0];
+      for (let rank of RPG_RANKS) {
+        if (appState.user.xp >= rank.minXp) {
+          currentLvlObj = rank;
+        }
+      }
+
+      if (currentLvlObj.lvl > appState.user.level) {
+        appState.user.level = currentLvlObj.lvl;
+        appState.user.rank = currentLvlObj.name;
+        showLevelUpModal(currentLvlObj);
+      }
+
+      updateUserHeaderUI();
+      saveAppState();
+    }
+
+    function updateUserHeaderUI() {
+      document.getElementById('header-user-lvl').innerText = appState.user.level;
+      document.getElementById('header-user-rank').innerText = appState.user.rank;
+      document.getElementById('user-coins-display').innerText = appState.user.coins;
+
+      // Calculate XP bar percentage
+      let currentRank = RPG_RANKS.find(r => r.lvl === appState.user.level) || RPG_RANKS[0];
+      let nextRank = RPG_RANKS.find(r => r.lvl === appState.user.level + 1) || { minXp: currentRank.minXp * 2 };
+      
+      let range = nextRank.minXp - currentRank.minXp;
+      let progress = appState.user.xp - currentRank.minXp;
+      let pct = Math.min(100, Math.max(0, Math.floor((progress / range) * 100)));
+      
+      document.getElementById('header-xp-bar').style.width = pct + '%';
+    }
+
+    /* ========================================================================
+       MEDIAPIPE POSE AI ENGINE & SKELETON RENDERER
+       ======================================================================== */
+    let videoElement, canvasElement, canvasCtx;
+    let poseAI = null;
+    let cameraInstance = null;
+    let isCameraRunning = false;
+    let holdTimerInterval = null;
+
+    // Angle calculation between 3 landmark points
+    function calculateJointAngle(p1, p2, p3) {
+      if (!p1 || !p2 || !p3) return 0;
+      const radians = Math.atan2(p3.y - p2.y, p3.x - p2.x) - Math.atan2(p1.y - p2.y, p1.x - p2.x);
+      let angle = Math.abs((radians * 180.0) / Math.PI);
+      if (angle > 180.0) angle = 360.0 - angle;
+      return Math.round(angle);
+    }
+
+    function initPoseEngine() {
+      videoElement = document.getElementById('webcam');
+      canvasElement = document.getElementById('output_canvas');
+      canvasCtx = canvasElement.getContext('2d');
+
+      poseAI = new Pose({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+      });
+
+      poseAI.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        enableSegmentation: false,
+        minDetectionConfidence: 0.65,
+        minTrackingConfidence: 0.65
+      });
+
+      poseAI.onResults(onPoseResults);
+    }
+
+    function toggleCamera() {
+      if (!poseAI) initPoseEngine();
+
+      const btnText = document.getElementById('text-camera');
+      const btnIcon = document.getElementById('icon-camera');
+      const idlePlaceholder = document.getElementById('camera-idle-placeholder');
+
+      if (isCameraRunning) {
+        if (cameraInstance) cameraInstance.stop();
+        isCameraRunning = false;
+        btnText.innerText = "Start Camera";
+        btnIcon.className = "fa-solid fa-video";
+        idlePlaceholder.classList.remove('hidden');
+        if (holdTimerInterval) clearInterval(holdTimerInterval);
+      } else {
+        cameraInstance = new Camera(videoElement, {
+          onFrame: async () => {
+            await poseAI.send({ image: videoElement });
+          },
+          width: 1280,
+          height: 720
+        });
+        cameraInstance.start();
+        isCameraRunning = true;
+        btnText.innerText = "Stop Camera";
+        btnIcon.className = "fa-solid fa-video-slash";
+        idlePlaceholder.classList.add('hidden');
+      }
+    }
+
+    function onPoseResults(results) {
+      // Resize Canvas
+      canvasElement.width = videoElement.videoWidth || 640;
+      canvasElement.height = videoElement.videoHeight || 480;
+
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+      if (results.poseLandmarks) {
+        // Draw Pose Connections & Nodes
+        drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, { color: '#22c55e', lineWidth: 4 });
+        drawLandmarks(canvasCtx, results.poseLandmarks, { color: '#06b6d4', fillColor: '#15803d', lineWidth: 2, radius: 5 });
+
+        // Process Movement Telemetry based on selected exercise
+        processExerciseLogic(results.poseLandmarks);
+      } else {
+        updateFeedbackUI("No athlete detected in frame", "warning");
+      }
+
+      canvasCtx.restore();
+    }
+
+    function processExerciseLogic(landmarks) {
+      const ex = appState.currentExercise;
+      let angle = 0;
+
+      // Extract Landmark Nodes (11: L Shoulder, 12: R Shoulder, 23: L Hip, 24: R Hip, 25: L Knee, 26: R Knee, 27: L Ankle, 28: R Ankle)
+      if (ex.primaryJoint === 'knee') {
+        const p1 = landmarks[23]; // Hip
+        const p2 = landmarks[25]; // Knee
+        const p3 = landmarks[27]; // Ankle
+        angle = calculateJointAngle(p1, p2, p3);
+      } else if (ex.primaryJoint === 'elbow') {
+        const p1 = landmarks[11]; // Shoulder
+        const p2 = landmarks[13]; // Elbow
+        const p3 = landmarks[15]; // Wrist
+        angle = calculateJointAngle(p1, p2, p3);
+      } else if (ex.primaryJoint === 'hip') {
+        const p1 = landmarks[11]; // Shoulder
+        const p2 = landmarks[23]; // Hip
+        const p3 = landmarks[25]; // Knee
+        angle = calculateJointAngle(p1, p2, p3);
+      } else if (ex.primaryJoint === 'shoulder') {
+        const p1 = landmarks[23]; // Hip
+        const p2 = landmarks[11]; // Shoulder
+        const p3 = landmarks[13]; // Elbow
+        angle = calculateJointAngle(p1, p2, p3);
+      }
+
+      document.getElementById('joint-angle-val').innerText = angle + '°';
+
+      // Dynamic Rep Engine vs Isometric Hold Engine
+      if (ex.type === 'rep') {
+        processRepEngine(angle, ex);
+      } else if (ex.type === 'hold') {
+        processHoldEngine(angle, ex);
+      }
+    }
+
+    function processRepEngine(angle, ex) {
+      // Rep State Machine
+      if (angle <= ex.repAngleMin && appState.session.repPhase === 'up') {
+        appState.session.repPhase = 'down';
+        document.getElementById('secondary-metric-val').innerText = 'Bottom Phase';
+        document.getElementById('secondary-metric-val').className = 'text-sm font-bold text-amber-400';
+        updateFeedbackUI('Good depth! Now push up', 'success');
+      } else if (angle >= ex.repAngleMax && appState.session.repPhase === 'down') {
+        appState.session.repPhase = 'up';
+        appState.session.reps++;
+        
+        // Update Stats & SFX
+        document.getElementById('primary-metric-val').innerText = appState.session.reps;
+        document.getElementById('secondary-metric-val').innerText = 'Top Phase';
+        document.getElementById('secondary-metric-val').className = 'text-sm font-bold text-emerald-400';
+        playBeep(600, 0.12);
+
+        // Add XP reward per rep
+        addXP(5);
+        document.getElementById('session-xp-gained').innerText = `+${appState.session.reps * 5} XP`;
+        document.getElementById('session-coins-gained').innerText = `+${Math.floor(appState.session.reps * 2.5)}`;
+
+        updateFeedbackUI(`Rep ${appState.session.reps} completed!`, 'success');
+      }
+    }
+
+    function processHoldEngine(angle, ex) {
+      const isTargetPosture = Math.abs(angle - ex.holdTargetAngle) <= ex.holdTolerance;
+
+      if (isTargetPosture) {
+        if (!appState.session.holdActive) {
+          appState.session.holdActive = true;
+          startHoldTimer();
+        }
+        updateFeedbackUI('Holding position - posture solid!', 'success');
+        document.getElementById('secondary-metric-val').innerText = 'Holding Active';
+        document.getElementById('secondary-metric-val').className = 'text-sm font-bold text-emerald-400';
+      } else {
+        if (appState.session.holdActive) {
+          appState.session.holdActive = false;
+          pauseHoldTimer();
+        }
+        updateFeedbackUI('Adjust posture to hold target range', 'warning');
+        document.getElementById('secondary-metric-val').innerText = 'Posture Paused';
+        document.getElementById('secondary-metric-val').className = 'text-sm font-bold text-rose-400';
+      }
+    }
+
+    function startHoldTimer() {
+      if (holdTimerInterval) clearInterval(holdTimerInterval);
+      holdTimerInterval = setInterval(() => {
+        if (appState.session.holdActive) {
+          appState.session.holdSeconds++;
+          document.getElementById('primary-metric-val').innerText = appState.session.holdSeconds + 's';
+          playBeep(800, 0.05);
+
+          if (appState.session.holdSeconds % 5 === 0) {
+            addXP(10);
+            document.getElementById('session-xp-gained').innerText = `+${appState.session.holdSeconds * 2} XP`;
+          }
+        }
+      }, 1000);
+    }
+
+    function pauseHoldTimer() {
+      if (holdTimerInterval) clearInterval(holdTimerInterval);
+    }
+
+    function updateFeedbackUI(msg, status = 'info') {
+      const textEl = document.getElementById('feedback-text');
+      const dotEl = document.getElementById('status-dot');
+      textEl.innerText = msg;
+
+      if (status === 'success') {
+        dotEl.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
+      } else if (status === 'warning') {
+        dotEl.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse';
+      } else {
+        dotEl.className = 'w-2.5 h-2.5 rounded-full bg-cyber-cyan animate-pulse';
+      }
+    }
+
+    /* ========================================================================
+       UI TABS, MODALS & SEARCH NAVIGATION
+       ======================================================================== */
+    function switchTab(tabId) {
+      ['workout', 'codex', 'dashboard'].forEach(t => {
+        const tabEl = document.getElementById(`tab-${t}`);
+        const btnEl = document.getElementById(`nav-btn-${t}`);
+        if (t === tabId) {
+          tabEl.classList.remove('hidden');
+          tabEl.classList.add('flex');
+          btnEl.className = 'px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center space-x-2 bg-brand-500 text-slate-950 shadow-md';
+        } else {
+          tabEl.classList.add('hidden');
+          tabEl.classList.remove('flex');
+          btnEl.className = 'px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-slate-800/60';
+        }
+      });
+
+      if (tabId === 'codex') renderCodexGrid();
+      if (tabId === 'dashboard') renderDashboardCharts();
+    }
+
+    /* Exercise Selection Modal functions */
+    function openExerciseSelectorModal() {
+      document.getElementById('modal-exercise-selector').classList.remove('hidden');
+      document.getElementById('modal-exercise-selector').classList.add('flex');
+      renderModalExerciseList(EXERCISE_DATABASE);
+    }
+
+    function closeExerciseSelectorModal() {
+      document.getElementById('modal-exercise-selector').classList.add('hidden');
+      document.getElementById('modal-exercise-selector').classList.remove('flex');
+    }
+
+    function renderModalExerciseList(exercises) {
+      const container = document.getElementById('modal-exercise-list');
+      container.innerHTML = exercises.map(ex => `
+        <div onclick="selectExercise('${ex.id}')" class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-brand-500/50 cursor-pointer flex items-center justify-between transition-all group">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center group-hover:bg-brand-500 group-hover:text-slate-950 transition-all">
+              <i class="fa-solid ${ex.icon} text-lg"></i>
+            </div>
+            <div>
+              <div class="text-sm font-extrabold text-white">${ex.name}</div>
+              <div class="text-xs text-slate-400">${ex.category} • ${ex.muscles}</div>
+            </div>
+          </div>
+          <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${ex.type === 'rep' ? 'bg-cyber-cyan/10 text-cyber-cyan border border-cyber-cyan/20' : 'bg-cyber-violet/10 text-cyber-violet border border-cyber-violet/20'}">
+            ${ex.type === 'rep' ? 'Rep Based' : 'Hold Based'}
+          </span>
+        </div>
+      `).join('');
+    }
+
+    function selectExercise(exId) {
+      const selected = EXERCISE_DATABASE.find(e => e.id === exId);
+      if (!selected) return;
+
+      appState.currentExercise = selected;
+      resetCurrentSession();
+
+      // Update Workout Studio UI Elements
+      document.getElementById('current-exercise-title').innerText = selected.name;
+      document.getElementById('selected-exercise-icon-box').innerHTML = `<i class="fa-solid ${selected.icon} text-lg"></i>`;
+      document.getElementById('target-muscle-tags').innerText = selected.muscles;
+      document.getElementById('exercise-quick-tip').innerText = selected.tip;
+
+      const badge = document.getElementById('current-exercise-badge');
+      if (selected.type === 'rep') {
+        badge.innerText = 'Dynamic Rep';
+        badge.className = 'px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider bg-cyber-cyan/10 border border-cyber-cyan/20 text-cyber-cyan';
+        document.getElementById('metric-label').innerText = 'Total Reps';
+        document.getElementById('primary-metric-val').innerText = '0';
+      } else {
+        badge.innerText = 'Isometric Hold';
+        badge.className = 'px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider bg-cyber-violet/10 border border-cyber-violet/20 text-cyber-violet';
+        document.getElementById('metric-label').innerText = 'Hold Time';
+        document.getElementById('primary-metric-val').innerText = '0s';
+      }
+
+      closeExerciseSelectorModal();
+    }
+
+    function filterModalExercises() {
+      const query = document.getElementById('modal-exercise-search').value.toLowerCase();
+      const filtered = EXERCISE_DATABASE.filter(ex => 
+        ex.name.toLowerCase().includes(query) || ex.muscles.toLowerCase().includes(query) || ex.category.toLowerCase().includes(query)
+      );
+      renderModalExerciseList(filtered);
+    }
+
+    function setModalFilter(cat) {
+      document.querySelectorAll('.modal-tag-btn').forEach(btn => {
+        btn.className = 'modal-tag-btn px-3 py-1 rounded-lg text-xs font-bold bg-slate-900 text-slate-400 border border-slate-800';
+      });
+      event.target.className = 'modal-tag-btn px-3 py-1 rounded-lg text-xs font-bold bg-brand-500 text-slate-950';
+
+      if (cat === 'all') {
+        renderModalExerciseList(EXERCISE_DATABASE);
+      } else {
+        const filtered = EXERCISE_DATABASE.filter(ex => ex.category === cat);
+        renderModalExerciseList(filtered);
+      }
+    }
+
+    function resetCurrentSession() {
+      appState.session = {
+        reps: 0,
+        holdSeconds: 0,
+        repPhase: 'up',
+        holdActive: false,
+        startTime: null,
+        formAccuracy: 100
+      };
+      if (holdTimerInterval) clearInterval(holdTimerInterval);
+      document.getElementById('primary-metric-val').innerText = '0';
+      document.getElementById('secondary-metric-val').innerText = 'Ready';
+      document.getElementById('session-xp-gained').innerText = '+0 XP';
+      document.getElementById('session-coins-gained').innerText = '+0';
+    }
+
+    function finishAndLogWorkoutSet() {
+      const count = appState.currentExercise.type === 'rep' ? appState.session.reps : appState.session.holdSeconds;
+      if (count <= 0) {
+        alert("Complete at least 1 rep or hold second before saving your set!");
+        return;
+      }
+
+      const logItem = {
+        id: Date.now(),
+        date: new Date().toLocaleDateString(),
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        exerciseName: appState.currentExercise.name,
+        type: appState.currentExercise.type,
+        value: count
+      };
+
+      appState.history.unshift(logItem);
+
+      // Update Goals Progress
+      appState.goals.forEach(goal => {
+        if (goal.exerciseId === appState.currentExercise.id) {
+          goal.current += count;
+          if (goal.current >= goal.target) goal.completed = true;
+        }
+      });
+
+      saveAppState();
+      confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
+      playLevelUpSound();
+      resetCurrentSession();
+      alert("Workout set successfully saved to your Fit Pose history!");
+    }
+
+    /* Exercise Codex Grid Renderer */
+    function renderCodexGrid(filterCat = 'all') {
+      const container = document.getElementById('codex-grid');
+      const search = document.getElementById('codex-search-input')?.value.toLowerCase() || '';
+
+      const items = EXERCISE_DATABASE.filter(ex => {
+        const matchesCat = filterCat === 'all' || ex.category === filterCat;
+        const matchesQuery = ex.name.toLowerCase().includes(search) || ex.muscles.toLowerCase().includes(search);
+        return matchesCat && matchesQuery;
+      });
+
+      container.innerHTML = items.map(ex => `
+        <div class="glass-card glass-card-hover p-6 rounded-2xl flex flex-col justify-between space-y-4">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <div class="w-10 h-10 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center">
+                <i class="fa-solid ${ex.icon} text-lg"></i>
+              </div>
+              <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-slate-900 border border-slate-800 text-slate-300">
+                ${ex.difficulty}
+              </span>
+            </div>
+
+            <h3 class="text-base font-extrabold text-white">${ex.name}</h3>
+            <p class="text-xs text-brand-400 font-semibold mt-0.5">${ex.muscles}</p>
+            <p class="text-xs text-slate-300 leading-relaxed mt-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800/80">
+              ${ex.tip}
+            </p>
+          </div>
+
+          <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between">
+            <span class="text-[11px] text-slate-400"><i class="fa-solid fa-camera mr-1"></i> ${ex.cameraAngleTip}</span>
+            <button onclick="selectExercise('${ex.id}'); switchTab('workout');" class="text-xs font-bold text-brand-400 hover:text-brand-300 flex items-center space-x-1">
+              <span>Start</span>
+              <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function filterCodexExercises() {
+      renderCodexGrid();
+    }
+
+    function setCodexFilter(cat) {
+      document.querySelectorAll('.codex-filter-btn').forEach(btn => {
+        btn.className = 'codex-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-slate-900 text-slate-400 border border-slate-800 hover:text-white';
+      });
+      event.target.className = 'codex-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-brand-500 text-slate-950';
+      renderCodexGrid(cat);
+    }
+
+    /* ========================================================================
+       CHARTS & DASHBOARD ANALYTICS
+       ======================================================================== */
+    let volumeChartInstance = null;
+    let radarChartInstance = null;
+
+    function renderDashboardCharts() {
+      // Calculate Stats
+      const totalWorkouts = appState.history.length;
+      let totalReps = 0;
+      let totalHoldTime = 0;
+
+      appState.history.forEach(h => {
+        if (h.type === 'rep') totalReps += h.value;
+        else totalHoldTime += h.value;
+      });
+
+      document.getElementById('dash-total-workouts').innerText = totalWorkouts;
+      document.getElementById('dash-total-reps').innerText = totalReps;
+      document.getElementById('dash-total-hold-time').innerText = totalHoldTime + 's';
+      document.getElementById('dash-active-streak').innerText = `${appState.user.streak} Days`;
+
+      renderGoalsListUI();
+      renderActivityLogUI();
+
+      // Chart.js Weekly Volume Bar Chart
+      const ctxBar = document.getElementById('chart-weekly-volume').getContext('2d');
+      if (volumeChartInstance) volumeChartInstance.destroy();
+
+      volumeChartInstance = new Chart(ctxBar, {
+        type: 'bar',
+        data: {
+          labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+          datasets: [{
+            label: 'Reps Completed',
+            data: [25, 40, 60, 30, 80, 45, totalReps % 100],
+            backgroundColor: '#22c55e',
+            borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#94a3b8' } },
+            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }
+          }
+        }
+      });
+
+      // Chart.js Muscle Radar Chart
+      const ctxRadar = document.getElementById('chart-muscle-radar').getContext('2d');
+      if (radarChartInstance) radarChartInstance.destroy();
+
+      radarChartInstance = new Chart(ctxRadar, {
+        type: 'radar',
+        data: {
+          labels: ['Chest', 'Legs', 'Abs', 'Back', 'Arms', 'Cardio'],
+          datasets: [{
+            label: 'Focus Intensity',
+            data: [75, 90, 80, 60, 70, 85],
+            backgroundColor: 'rgba(6, 182, 212, 0.2)',
+            borderColor: '#06b6d4',
+            pointBackgroundColor: '#06b6d4'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            r: {
+              grid: { color: 'rgba(255,255,255,0.08)' },
+              angleLines: { color: 'rgba(255,255,255,0.08)' },
+              ticks: { display: false }
+            }
+          }
+        }
+      });
+    }
+
+    function renderGoalsListUI() {
+      const container = document.getElementById('goals-container-list');
+      if (!appState.goals || appState.goals.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400">No active goals set. Click "New Goal" to add one!</p>`;
+        return;
+      }
+
+      container.innerHTML = appState.goals.map(g => {
+        const ex = EXERCISE_DATABASE.find(e => e.id === g.exerciseId) || { name: g.exerciseId };
+        const pct = Math.min(100, Math.floor((g.current / g.target) * 100));
+        return `
+          <div class="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-extrabold text-white">${ex.name} Target</span>
+              <span class="font-mono text-slate-400">${g.current} / ${g.target} (${pct}%)</span>
+            </div>
+            <div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+              <div class="bg-gradient-to-r from-brand-500 to-cyber-cyan h-full transition-all duration-300" style="width: ${pct}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderActivityLogUI() {
+      const container = document.getElementById('recent-activity-list');
+      if (appState.history.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-500 p-2">No completed sets logged yet.</p>`;
+        return;
+      }
+
+      container.innerHTML = appState.history.slice(0, 10).map(h => `
+        <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-center justify-between text-xs">
+          <div>
+            <span class="font-extrabold text-slate-200 block">${h.exerciseName}</span>
+            <span class="text-[10px] text-slate-500">${h.date} at ${h.time}</span>
+          </div>
+          <span class="font-mono font-bold text-brand-400">
+            ${h.value} ${h.type === 'rep' ? 'reps' : 'sec'}
+          </span>
+        </div>
+      `).join('');
+    }
+
+    /* Modal Goal Creators & RPG Level Modal */
+    function openCreateGoalModal() {
+      const select = document.getElementById('goal-input-exercise');
+      select.innerHTML = EXERCISE_DATABASE.map(ex => `<option value="${ex.id}">${ex.name}</option>`).join('');
+      document.getElementById('modal-create-goal').classList.remove('hidden');
+      document.getElementById('modal-create-goal').classList.add('flex');
+    }
+
+    function closeCreateGoalModal() {
+      document.getElementById('modal-create-goal').classList.add('hidden');
+      document.getElementById('modal-create-goal').classList.remove('flex');
+    }
+
+    function saveNewGoal() {
+      const exId = document.getElementById('goal-input-exercise').value;
+      const target = parseInt(document.getElementById('goal-input-target').value) || 50;
+
+      appState.goals.push({
+        id: 'g_' + Date.now(),
+        exerciseId: exId,
+        target: target,
+        current: 0,
+        completed: false
+      });
+
+      saveAppState();
+      closeCreateGoalModal();
+      renderDashboardCharts();
+    }
+
+    function showLevelUpModal(rankObj) {
+      document.getElementById('modal-lvl-num').innerText = rankObj.lvl;
+      document.getElementById('modal-lvl-title').innerText = rankObj.name;
+      document.getElementById('modal-level-up').classList.remove('hidden');
+      document.getElementById('modal-level-up').classList.add('flex');
+      confetti({ particleCount: 120, spread: 80, origin: { y: 0.5 } });
+      playLevelUpSound();
+    }
+
+    function closeLevelUpModal() {
+      document.getElementById('modal-level-up').classList.add('hidden');
+      document.getElementById('modal-level-up').classList.remove('flex');
+    }
+
+    function exportDataJSON() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appState, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `fit_pose_backup_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function resetAllAppData() {
+      if (confirm("Are you sure you want to reset all Fit Pose RPG progress and activity history?")) {
+        localStorage.removeItem(STORAGE_KEY);
+        location.reload();
+      }
+    }
+
+    // INITIALIZATION ON WINDOW LOAD
+    window.onload = function () {
+      loadAppState();
+      selectExercise(appState.currentExercise.id);
+    };
+  </script>
+</body>
+</html>
